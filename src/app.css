@@ -4,5 +4,11 @@
 }
 
 body {
-  margin: 0;
+  margin: 20px 0 0;
+  background: radial-gradient(circle, #173260, #031322);
+}
+
+.navbar {
+  margin: 20px 0 0;
+  background: #9ab8d5;
 }
