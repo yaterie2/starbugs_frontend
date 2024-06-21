@@ -1,5 +1,5 @@
 <script>
-    import { resultsStore } from "../store.js";
+    import { resultsStore } from "./store.js";
     import { onMount } from "svelte";
     import axios from "axios";
 
@@ -17,9 +17,9 @@
 
     async function fetchStars() {
         const API_URL = `${
-            import.meta.env.VITE_API_BASE_URL
+            import.meta.env.VITE_API_BASE_URL || "https://starapp-api.yannick-schwab.de"
         }/constellation?constellation=${selectedConstellation}`;
-         console.log(API_URL);
+        console.log(API_URL);
         try {
             const response = await axios.get(API_URL);
             resultsStore.set(response.data);
@@ -35,9 +35,9 @@
     $: selectedConstellation, fetchStars();
 </script>
 
-<label for="constellationSelect">Wähle eine Konstellation:</label>
+<label for="constellationSelect">Wähle eine Konstellation</label>
 
-<select id="constellationSelect" bind:value={selectedConstellation}>
+<select id="constellationSelect" bind:value={selectedConstellation} class="constellation-select">
     {#each constellations as constellation}
         <option value={constellation}>{constellation}</option>
     {/each}
