@@ -3,14 +3,14 @@
   import axios from "axios";
   import * as THREE from "three";
   import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-  import { writable } from 'svelte/store';
+//   import { writable } from 'svelte/store';
 
   let raycaster = new THREE.Raycaster();
   let mouse = new THREE.Vector2();
 
   let camera, scene, renderer, controls;
-  let loading = writable(false);
-  let errorMessage = writable('');
+//   let loading = writable(false);
+//   let errorMessage = writable('');
 
   const maxMag = 8;
   const minRadius = 0.17;
@@ -30,7 +30,7 @@
   onMount(() => {
     init();
     loadAllStars(); // Load all stars within the magnitude range
-    addExtraStars(extraStarsCount); // Füge zusätzliche zufällige Sterne hinzu
+    // addExtraStars(extraStarsCount); // Füge zusätzliche zufällige Sterne hinzu
 
     // Event-Listener für Maus-Klicks hinzufügen
     renderer.domElement.addEventListener("click", onMouseClick);
@@ -61,8 +61,8 @@
   }
 
   async function loadAllStars() {
-    loading.set(true);
-    const url = `https://starapp-api.yannick-schwab.de/allstars?minMag=-26.7&maxMag=7`; // Adjusted endpoint to get all stars within the magnitude range
+    // loading.set(true);
+    const url = `https://starapp-api.yannick-schwab.de/api/allstars?minMag=-26.7&maxMag=7`; // Adjusted endpoint to get all stars within the magnitude range
     try {
       const response = await axios.get(url);
       if (clear) {
@@ -70,17 +70,18 @@
         starGroup.clear();
         hitboxGroup.clear(); // Hitbox-Gruppe leeren
       }
+      console.log(response.data.stars)
       const starsData = response.data.stars
         .filter(
           (star) =>
-            star.x0 !== undefined &&
-            star.y0 !== undefined &&
-            star.z0 !== undefined
+            star.x !== undefined &&
+            star.y !== undefined &&
+            star.z !== undefined
         )
         .map((star) => ({
-          x: star.x0,
-          y: star.y0,
-          z: star.z0,
+          x: star.x,
+          y: star.y,
+          z: star.z,
           id: star.id,
           absmag: star.absmag,
           ci: star.ci,
@@ -91,11 +92,12 @@
           constellation: star.constellation // Include constellation if available
         }));
       addStars(starsData);
-      loading.set(false);
+      console.log(starsData)
+    //   loading.set(false);
     } catch (error) {
       console.error("Fehler beim Abrufen der Sterndaten:", error);
       errorMessage.set('Fehler beim Laden der Sterne');
-      loading.set(false);
+    //   loading.set(false);
     }
   }
 
@@ -129,11 +131,11 @@
         scaledRadius = 0.05;
       }
       if (star.dist < 200) {
-        starGeometry = new THREE.SphereGeometry(scaledRadius, 16, 16);
+        starGeometry = new THREE.SphereGeometry(0.1, 16, 16);
       } else if (star.dist < 400) {
-        starGeometry = new THREE.SphereGeometry(scaledRadius, 8, 8);
+        starGeometry = new THREE.SphereGeometry(0.1, 8, 8);
       } else {
-        starGeometry = new THREE.SphereGeometry(scaledRadius, 4, 4);
+        starGeometry = new THREE.SphereGeometry(0.1, 4, 4);
       }
 
       const starMaterial = new THREE.MeshStandardMaterial({
