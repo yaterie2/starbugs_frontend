@@ -5,7 +5,7 @@
   import Statistics from './Stats.svelte';
   import NavBar from './NavBar.svelte';
   import POV from './POV.svelte';
-  
+
   const routes = {
     '/': Home,
     '/statistics': Statistics,
