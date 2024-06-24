@@ -21,7 +21,7 @@
 
 <style>
   main {
-    padding-top: 4rem; /* Adjust based on the height of your navbar */
+    padding-top: 0rem; /* Adjust based on the height of your navbar */
     display: flex;
     flex-direction: column;
     align-items: center;

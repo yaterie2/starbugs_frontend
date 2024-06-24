@@ -1,38 +1,40 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import axios from "axios";
   import * as THREE from "three";
   import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-//   import { writable } from 'svelte/store';
 
   let raycaster = new THREE.Raycaster();
   let mouse = new THREE.Vector2();
 
   let camera, scene, renderer, controls;
-//   let loading = writable(false);
-//   let errorMessage = writable('');
+  let earthContainer;
+  const SUN_POSITION = { x: 0.000005, y: 0, z: 0 };
 
   const maxMag = 8;
   const minRadius = 0.17;
   const maxRadius = 1587.37;
-  const minNewRadius = 0.05; // Mindestgröße für Sichtbarkeit
-  const maxNewRadius = 0.3; // Maximalgröße für die Darstellung
-  let selectedArray;
+  const minNewRadius = 0.07; // Minimum size for stars
+  const maxNewRadius = 2; // Maximum size for stars
   let sunIgnored = false;
 
   let lineGroup = new THREE.Group();
   let starGroup = new THREE.Group();
-  let hitboxGroup = new THREE.Group(); // Gruppe für die Hitboxen
+  let hitboxGroup = new THREE.Group(); // Group for hitboxes
   let clear = false;
 
-  const extraStarsCount = 5000; // Anzahl der zusätzlichen zufälligen Sterne
+  const SUN_RADIUS = 1; // Using 1 unit as the Sun's radius for scaling
+
+  const EARTH_RADIUS_KM = 6371;
+  const SUN_RADIUS_KM = 696340;
+  const EARTH_SUN_DISTANCE_KM = 149600000;
+
+  const EARTH_RADIUS = (EARTH_RADIUS_KM / SUN_RADIUS_KM) * SUN_RADIUS;
+  const EARTH_SUN_DISTANCE = (EARTH_SUN_DISTANCE_KM / SUN_RADIUS_KM) * SUN_RADIUS;
 
   onMount(() => {
     init();
     loadAllStars(); // Load all stars within the magnitude range
-    // addExtraStars(extraStarsCount); // Füge zusätzliche zufällige Sterne hinzu
-
-    // Event-Listener für Maus-Klicks hinzufügen
     renderer.domElement.addEventListener("click", onMouseClick);
   });
 
@@ -40,37 +42,108 @@
     camera = new THREE.PerspectiveCamera(
       75,
       window.innerWidth / window.innerHeight,
-      0.1,
-      300
+      0.01,
+      1000
     );
-    camera.position.z = 0.0001;
+    camera.position.set(21, 0, 0.1); // Initial camera position
 
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000); // Setzen Sie explizit eine Hintergrundfarbe
+    scene.background = new THREE.Color(0x000000); // Set a background color
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement); // Stellen Sie sicher, dass dies ausgeführt wird
+    document.body.appendChild(renderer.domElement); // Ensure this is executed
 
     controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true; // Enable smooth transitions
+    controls.dampingFactor = 0.25;
+    controls.screenSpacePanning = false;
+    controls.minDistance = 0.01; // Minimum distance for zooming in
+    controls.maxDistance = 5; // Maximum distance for zooming out
+    controls.target.set(1, 0, 0);
 
     scene.add(lineGroup);
     scene.add(starGroup);
-    scene.add(hitboxGroup); // Hitbox-Gruppe zur Szene hinzufügen
+    scene.add(hitboxGroup); // Hitbox group to scene
+
+    // Add ambient light
+    const ambientLight = new THREE.AmbientLight(0x404040, 10); // Soft white light
+    scene.add(ambientLight);
+
+    // Add directional light
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
+    directionalLight.position.set(0.000005, 0, 0); // Position at the Sun's location
+    scene.add(directionalLight);
+
+    addEarthToScene(); // Add Earth to the scene
+
     animate();
   }
 
+  function calculateEarthProportion(sunRadius) {
+  // Example calculation based on your data
+  const earthRadius = 6371; // Earth radius in km (this should be calculated based on your data)
+  const sunRadiusKm = sunRadius * 696340; // Convert Sun's radius to km
+
+  // Calculate Earth's proportion relative to the Sun
+  const earthProportion = earthRadius / sunRadiusKm;
+
+  return earthProportion;
+}
+
+
+  function addEarthToScene() {
+  const sunRadius = SUN_RADIUS; // Assuming SUN_RADIUS is defined somewhere in your code
+  const earthRadiusProportion = calculateEarthProportion(sunRadius);
+
+  // Set up the Earth sphere geometry and material
+  const geometry = new THREE.SphereGeometry(sunRadius * earthRadiusProportion, 30, 30);
+
+  // Load the Earth texture
+  const textureLoader = new THREE.TextureLoader();
+  const earthTexture = textureLoader.load("/images/earthmap1k.jpg");
+
+  const material = new THREE.MeshStandardMaterial({ map: earthTexture });
+
+  // Create the Earth mesh
+  const earthMesh = new THREE.Mesh(geometry, material);
+
+  // Create a container for Earth mesh
+  earthContainer = new THREE.Object3D();
+  earthContainer.add(earthMesh);
+
+  // Position the Earth at the calculated distance from the Sun
+  earthContainer.position.set(1, 0, 0); // Adjust x, y, z as needed
+  scene.add(earthContainer); // Add Earth container to the scene
+
+  // Position camera next to Earth and look at it
+  // const cameraPosition = new THREE.Vector3().copy(earthContainer.position);
+  // cameraPosition.x += 3 * sunRadius * earthRadiusProportion; // Offset from Earth's position for a good view
+  // camera.position.copy(cameraPosition);
+  // camera.lookAt(earthContainer.position);
+
+  console.log("Earth's center coordinates:", earthContainer.position);
+}
+
+
+
+  onDestroy(() => {
+    if (earthContainer) {
+      scene.remove(earthContainer);
+      earthContainer = null;
+    }
+  });
+
   async function loadAllStars() {
-    // loading.set(true);
     const url = `https://starapp-api.yannick-schwab.de/api/allstars?minMag=-26.7&maxMag=7`; // Adjusted endpoint to get all stars within the magnitude range
     try {
       const response = await axios.get(url);
       if (clear) {
         lineGroup.clear();
         starGroup.clear();
-        hitboxGroup.clear(); // Hitbox-Gruppe leeren
+        hitboxGroup.clear(); // Clear hitbox group
       }
-      console.log(response.data.stars)
+      console.log(response.data.stars);
       const starsData = response.data.stars
         .filter(
           (star) =>
@@ -92,12 +165,8 @@
           constellation: star.constellation // Include constellation if available
         }));
       addStars(starsData);
-      console.log(starsData)
-    //   loading.set(false);
     } catch (error) {
       console.error("Fehler beim Abrufen der Sterndaten:", error);
-      errorMessage.set('Fehler beim Laden der Sterne');
-    //   loading.set(false);
     }
   }
 
@@ -108,10 +177,10 @@
     }
 
     stars.forEach((star) => {
-      if (star.id === 1 && sunIgnored == false) {
-        sunIgnored = true;
-        return;
+      if (star.id === 1) {
+        sunIgnored = true; // Mark the Sun as processed
       }
+
       let starGeometry;
       const originalRadius = berechneSternRadius(star.ci, star.absmag);
       let scaledRadius = mapRadius(
@@ -124,18 +193,18 @@
       let color = getColorByCI(star.ci);
       let intensity = getIntensityByMag(star.mag);
       if (star.id === 1) {
-        color = 0xff0000;
-        intensity = 0xff0000;
+        color = 0xffff00; // Yellow for the Sun
+        intensity = 1.0; // Max intensity for the Sun
       }
       if (isNaN(scaledRadius)) {
         scaledRadius = 0.05;
       }
       if (star.dist < 200) {
-        starGeometry = new THREE.SphereGeometry(0.1, 16, 16);
+        starGeometry = new THREE.SphereGeometry(scaledRadius, 16, 16);
       } else if (star.dist < 400) {
-        starGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+        starGeometry = new THREE.SphereGeometry(scaledRadius, 8, 8);
       } else {
-        starGeometry = new THREE.SphereGeometry(0.1, 4, 4);
+        starGeometry = new THREE.SphereGeometry(scaledRadius, 4, 4);
       }
 
       const starMaterial = new THREE.MeshStandardMaterial({
@@ -146,24 +215,24 @@
 
       const sphere = new THREE.Mesh(starGeometry, starMaterial);
 
-      // Skalierung der Position der Sterne
+      // Scaling the position of stars
       sphere.position.set(star.y, star.z, star.x);
-      sphere.userData.starData = { ...star }; // Daten anhängen
+      sphere.userData.starData = { ...star }; // Attach data
       starGroup.add(sphere);
 
-      // Hinzufügen der unsichtbaren Hitbox
-      const hitboxGeometry = new THREE.SphereGeometry(1, 16, 16); // Größe der Hitbox
+      // Add invisible hitbox
+      const hitboxGeometry = new THREE.SphereGeometry(1, 16, 16); // Size of the hitbox
       const hitboxMaterial = new THREE.MeshBasicMaterial({ visible: false });
       const hitbox = new THREE.Mesh(hitboxGeometry, hitboxMaterial);
       hitbox.position.set(star.y, star.z, star.x);
-      hitbox.userData.starData = { ...star }; // Daten anhängen
+      hitbox.userData.starData = { ...star }; // Attach data
       hitboxGroup.add(hitbox);
     });
   }
 
   function addExtraStars(count) {
     for (let i = 0; i < count; i++) {
-      const x = (Math.random() - 0.5) * 200; // Bereich erweitern
+      const x = (Math.random() - 0.5) * 200; // Extend range
       const y = (Math.random() - 0.5) * 200;
       const z = (Math.random() - 0.5) * 200;
 
@@ -191,12 +260,12 @@
       sphere.position.set(star.x, star.y, star.z);
       starGroup.add(sphere);
 
-      // Hinzufügen der unsichtbaren Hitbox
-      const hitboxGeometry = new THREE.SphereGeometry(1, 16, 16); // Größe der Hitbox
+      // Add invisible hitbox
+      const hitboxGeometry = new THREE.SphereGeometry(1, 16, 16); // Size of the hitbox
       const hitboxMaterial = new THREE.MeshBasicMaterial({ visible: false });
       const hitbox = new THREE.Mesh(hitboxGeometry, hitboxMaterial);
       hitbox.position.set(star.x, star.y, star.z);
-      hitbox.userData.starData = { ...star }; // Daten anhängen
+      hitbox.userData.starData = { ...star }; // Attach data
       hitboxGroup.add(hitbox);
     }
   }
@@ -216,7 +285,7 @@
         end.y, end.z, end.x
       ]);
       geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
-      const material = new THREE.LineBasicMaterial({ color: 0xffffff }); // Farbe der Linie
+      const material = new THREE.LineBasicMaterial({ color: 0xffffff }); // Line color
       const line = new THREE.Line(geometry, material);
       lineGroup.add(line);
     }
@@ -241,22 +310,36 @@
 
     scene.traverse(function (object) {
       if (object instanceof THREE.Mesh) {
+        const wasVisible = object.visible;
         object.visible = frustum.intersectsObject(object);
+        if (object.userData.starData && object.userData.starData.id !== undefined) {
+          if (object.visible !== wasVisible) {
+            // console.log(`Visibility changed for star: ${object.userData.starData.id}, now visible: ${object.visible}`);
+          }
+        }
       }
     });
   }
 
-  function berechneSternRadius(ci, absmag) {
-    const L0 = 3.0128e28;
-    const T0 = 5778;
-    const L = L0 * Math.pow(10, 0.4 * (4.75 - absmag));
-    const T = T0 * Math.pow(10, 0.92 * ci);
-    const radius = Math.sqrt(L) / Math.pow(T, 2);
-    return radius;
+  function berechneSternRadius(CI, M) {
+    const L_sonne = 3.828e26;
+    const sigma = 5.67e-8;
+    const pi = Math.PI;
+
+    const T = 4600 * (1 / (0.92 * CI + 1.7) + 1 / (0.92 * CI + 0.62));
+    const L = L_sonne * Math.pow(10, 0.4 * (4.83 - M));
+    const R = Math.sqrt(L / (4 * pi * sigma * Math.pow(T, 4)));
+    const R_sonnen = R / 6.96e8;
+
+    return R_sonnen;
   }
 
-  function mapRadius(value, inMin, inMax, outMin, outMax) {
-    return ((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin;
+  function mapRadius(originalRadius, minOriginal, maxOriginal, minNew, maxNew) {
+    return (
+      ((originalRadius - minOriginal) / (maxOriginal - minOriginal)) *
+        (maxNew - minNew) +
+      minNew
+    );
   }
 
   function getColorByCI(ci) {
@@ -300,7 +383,7 @@
 </script>
 
 <style>
-  body {
+  /* body {
     margin: 0;
-  }
+  } */
 </style>
