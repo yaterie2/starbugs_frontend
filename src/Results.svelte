@@ -1,4 +1,4 @@
-<!-- <script>
+<script>
     import { resultsStore } from "./store.js";
 
 </script>
@@ -53,4 +53,4 @@
     td {
         padding: 3px 5px;
     }
-</style> -->
+</style>

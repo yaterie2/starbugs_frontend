@@ -1,4 +1,4 @@
-<!-- <script>
+<script>
     import { resultsStore } from "./store.js";
     import { onMount } from "svelte";
     import axios from "axios";
@@ -41,4 +41,4 @@
     {#each constellations as constellation}
         <option value={constellation}>{constellation}</option>
     {/each}
-</select> -->
+</select>
